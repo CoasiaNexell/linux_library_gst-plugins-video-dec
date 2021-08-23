@@ -99,13 +99,14 @@ static void nxvideodec_get_offset_stride(gint width, gint height, guint8 *pSrc, 
 enum
 {
 	PROP_0,
+	PROP_LOW_DELAY,
 };
 #else
 enum
 {
 	PROP_0,
 	PROP_TYPE,	//0: 1:MM_VIDEO_BUFFER_TYPE_GEM
-	DISABLE_VIDEO_OUT_REORDER  //0:EnableOutReorder, 1:DisableOutReorder
+	PROP_LOW_DELAY,
 };
 enum
 {
@@ -222,6 +223,7 @@ nxvideodec_base_init (gpointer gclass)
 			"systemstream", G_TYPE_BOOLEAN, FALSE,
 			NULL) );
 
+#if ENABLE_DIVX
 	//	DIVX
 	gst_caps_append_structure (
 		pCapslist,
@@ -241,7 +243,7 @@ nxvideodec_base_init (gpointer gclass)
 			"height", GST_TYPE_INT_RANGE, 64, NX_MAX_HEIGHT,
 			"msmpegversion", G_TYPE_INT, 43,
 			NULL) );
-
+#endif	//	ENABLE_DIVX
 	// pad templates
 	pKlass->pSinktempl = gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, pCapslist);
 	gst_element_class_add_pad_template (pElement_class, pKlass->pSinktempl);
@@ -288,13 +290,27 @@ gst_nxvideodec_class_init (GstNxVideoDecClass * pKlass)
 	g_object_class_install_property (
 		pGobjectClass,
 		PROP_TYPE,
-		g_param_spec_int ("buffer-type", "buffer-type", "Buffer Type(0:NORMAL 1:MM_VIDEO_BUFFER_TYPE_GEM)", 0, 1, BUFFER_TYPE_GEM, G_PARAM_READWRITE));
-
-	g_object_class_install_property (
-		pGobjectClass,
-		DISABLE_VIDEO_OUT_REORDER,
-		g_param_spec_int ("disable-out-reorder", "Disable Video Out Reorder", "Disable Out Reorder(0:Enable-Out-Reorder 1:Disable-Out-Reorder)", 0, 1, 0, G_PARAM_READWRITE));
+		g_param_spec_int (
+			"buffer-type",
+			"buffer-type",
+			"Buffer Type(0:NORMAL 1:MM_VIDEO_BUFFER_TYPE_GEM)",
+			0,	/* minimum */
+			1,	/* maximum */
+			BUFFER_TYPE_GEM,	/* default */
+			G_PARAM_READWRITE)	/* flags */
+		);
 #endif
+
+	g_object_class_install_property ( pGobjectClass,
+		PROP_LOW_DELAY,
+		g_param_spec_boolean (
+			"low-delay",
+			"low-delay",
+			"Decoder output low delay",
+			false,
+			G_PARAM_READWRITE
+		)
+	);
 
 	FUNC_OUT();
 }
@@ -318,6 +334,8 @@ gst_nxvideodec_init (GstNxVideoDec *pNxVideoDec)
 #else
 	pNxVideoDec->bufferType = BUFFER_TYPE_GEM;
 #endif
+	pNxVideoDec->lowDelay = false;
+
 	pthread_mutex_init(&pNxVideoDec->mutex, NULL);
 
 	GST_PAD_SET_ACCEPT_TEMPLATE (GST_VIDEO_DECODER_SINK_PAD (pNxVideoDec));
@@ -342,10 +360,10 @@ gst_nxvideodec_set_property (GObject *pObject, guint propertyId,
 		case PROP_TYPE:
 			pNxvideodec->bufferType = g_value_get_int(pValue);
 			break;
-		case DISABLE_VIDEO_OUT_REORDER:
-			pNxvideodec->bDisableVideoOutReorder = g_value_get_int(pValue);
-			break;
 #endif
+		case PROP_LOW_DELAY:
+			pNxvideodec->lowDelay = g_value_get_boolean(pValue);
+			break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (pObject, propertyId, pPspec);
 			break;
@@ -370,10 +388,10 @@ gst_nxvideodec_get_property (GObject *pObject, guint propertyId,
 		case PROP_TYPE:
 			g_value_set_int(pValue, pNxvideodec->bufferType);
 			break;
-		case DISABLE_VIDEO_OUT_REORDER:
-			g_value_set_int(pValue, pNxvideodec->bDisableVideoOutReorder);
-			break;
 #endif
+		case PROP_LOW_DELAY:
+			g_value_set_boolean(pValue, pNxvideodec->lowDelay);
+			break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (pObject, propertyId, pPspec);
 			break;
@@ -599,7 +617,7 @@ gst_nxvideodec_set_format (GstVideoDecoder *pDecoder, GstVideoCodecState *pState
 			return ret;
 		}
 
-		if( 0 != InitVideoDec(pNxVideoDec->pNxVideoDecHandle, pNxVideoDec->bDisableVideoOutReorder) )
+		if( 0 != InitVideoDec(pNxVideoDec->pNxVideoDecHandle, pNxVideoDec->lowDelay) )
 		{
 			return FALSE;
 		}
@@ -850,7 +868,7 @@ gst_nxvideodec_handle_frame (GstVideoDecoder *pDecoder, GstVideoCodecFrame *pFra
 	if( (pNxVideoDec->bIsCodecData == FALSE) && (pNxVideoDec->bIsInitVideoDec == FALSE) )
 	{
 		pNxVideoDec->bIsInitVideoDec = TRUE;
-		if( 0 != InitVideoDec(pNxVideoDec->pNxVideoDecHandle, pNxVideoDec->bDisableVideoOutReorder) )
+		if( 0 != InitVideoDec(pNxVideoDec->pNxVideoDecHandle, pNxVideoDec->lowDelay) )
 		{
 			return GST_FLOW_ERROR;
 		}

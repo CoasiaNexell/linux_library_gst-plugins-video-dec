@@ -16,6 +16,8 @@ G_BEGIN_DECLS
 #define	MAX_INPUT_BUF_SIZE		(1024*1024*4)
 #define INVALID_TIMESTAMP -2
 
+#define ENABLE_DIVX			0
+
 //////////////////////////////////////////////////////////////////////////////
 //
 #define	NX_MAX_WIDTH		1920
@@ -117,7 +119,7 @@ struct _NX_VIDEO_DEC_STRUCT
 	gint64		dtsTimestamp;
 	gint64		ptsTimestamp;
 
-	gint 		bDisableVideoOutReorder;
+	gboolean	bLowDelay;
 
 	gint (*pVideoDecodeFrame)( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L2DEC_OUT *pDecOut, gboolean bKeyFrame );
 };
@@ -130,7 +132,7 @@ gboolean GetExtraInfo( NX_VIDEO_DEC_STRUCT *pDecHandle, guint8 *pCodecData, gint
 
 //Video Decoder
 NX_VIDEO_DEC_STRUCT *OpenVideoDec();
-gint InitVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle, gint bDisableVideoOutReorder );
+gint InitVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle, gint bLowDelay );
 gint VideoDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L2DEC_OUT *pDecOut, gboolean bKeyFrame );
 void CloseVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle );
 

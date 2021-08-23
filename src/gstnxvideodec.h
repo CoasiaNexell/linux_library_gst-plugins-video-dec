@@ -90,7 +90,7 @@ struct _GstNxVideoDec
 	GstVideoDecoder base_nxvideodec;
 	NX_VIDEO_DEC_STRUCT *pNxVideoDecHandle;
 	gint bufferType;
-	gint bDisableVideoOutReorder;
+	gboolean lowDelay;
 	// video state
 	GstVideoCodecState *pInputState;
 	gint	isState;

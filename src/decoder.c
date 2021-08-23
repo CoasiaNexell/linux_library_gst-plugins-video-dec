@@ -116,6 +116,7 @@ gint FindCodecInfo( GstVideoCodecState *pState, NX_VIDEO_DEC_STRUCT *pDecHandle 
 			codecType = V4L2_PIX_FMT_MPEG4;
 		}
 	}
+#if ENABLE_DIVX
 	// divx
 	else if( !strcmp(pMime, "video/x-divx" ) )
 	{
@@ -149,6 +150,7 @@ gint FindCodecInfo( GstVideoCodecState *pState, NX_VIDEO_DEC_STRUCT *pDecHandle 
 			codecType = V4L2_PIX_FMT_DIV3;
 		}
 	}
+#endif	//	ENABLE_DIVX
 
 	if( codecType == V4L2_PIX_FMT_H264 )
 	{
@@ -266,7 +268,7 @@ NX_VIDEO_DEC_STRUCT *OpenVideoDec()
 	return pDecHandle;
 }
 
-gint InitVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle, gint bDisableVideoOutReorder )
+gint InitVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle, gint bLowDelay )
 {
 	gint ret = 0;
 	FUNC_IN();
@@ -293,7 +295,7 @@ gint InitVideoDec( NX_VIDEO_DEC_STRUCT *pDecHandle, gint bDisableVideoOutReorder
 	pDecHandle->dtsTimestamp = -1;
 	pDecHandle->ptsTimestamp = -1;
 
-	pDecHandle->bDisableVideoOutReorder = bDisableVideoOutReorder;
+	pDecHandle->bLowDelay = bLowDelay;
 
 	FUNC_OUT();
 
@@ -1439,7 +1441,12 @@ static gint InitializeCodaVpu(NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pSeqInfo, gint
 		seqIn.height  = pHDec->height;
 		seqIn.seqBuf = pSeqInfo;
 		seqIn.seqSize = seqInfoSize;
-		seqIn.disableVideoOutReorder = pHDec->bDisableVideoOutReorder;
+
+		if( pHDec->bLowDelay )
+		{
+			seqIn.lowDelay = 1;
+		}
+
 		gint nxImageFormat = V4L2_PIX_FMT_YUV420;
 
 		if ( 0 != (ret = NX_V4l2DecParseVideoCfg( pHDec->hCodec, &seqIn, &seqOut )) )
