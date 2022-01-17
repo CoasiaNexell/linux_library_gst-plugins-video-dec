@@ -20,7 +20,7 @@ static gint Div3DecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf
 
 static gint ParseH264Info( guint8 *pData, gint size, NX_AVCC_TYPE *pH264Info );
 static gint ParseAvcStream( guint8 *pInBuf, gint inSize, gint nalLengthSize, unsigned char *pBuffer, gint *pIsKey );
-static gint InitializeCodaVpu( NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pInitBuf, gint initBufSize );
+static gint InitializeCodaVpu( NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pInitBuf, gint initBufSize, gint *remain );
 static gint FlushDecoder( NX_VIDEO_DEC_STRUCT *pNxVideoDecHandle );
 static gint NX_V4l2GetPlaneNum( guint iFourcc );
 //TimeStamp
@@ -383,6 +383,7 @@ gint AVCDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L
 		gint seqSize = 0;
 		guint8 *pSeqData = NULL;
 		pDecBuf = pHDec->pTmpStrmBuf;
+		gint remain = 0;
 
 		if( 0 == pHDec->extraDataSize )
 		{
@@ -492,7 +493,7 @@ gint AVCDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L
 		}
 
 		// Initialize VPU
-		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize);
+		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize, &remain);
 
 		if( 0 > ret )
 		{
@@ -511,6 +512,21 @@ gint AVCDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L
 		{
 			pHDec->size = 0;
 			pHDec->pos = 0;
+		}
+
+		if( remain > 0 && pHDec->bLowDelay )
+		{
+			g_print("LowdDelay Mode, remain = %d\n", remain);
+			decIn.strmBuf = pSeqData;
+			decIn.strmSize = seqSize;
+			decIn.timeStamp = 0;
+			decIn.eos = 0;
+			ret = NX_V4l2DecDecodeFrame( pHDec->hCodec,&decIn, pDecOut );
+
+			if( (0 == ret ) && (0 <= pDecOut->dispIdx) )
+			{
+				g_print("LowDelay Mode Got a Picture\n");
+			}
 		}
 	}
 	else
@@ -742,7 +758,7 @@ gint Mpeg2DecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V
 		}
 
 		// Initialize VPU
-		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize);
+		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize, NULL);
 
 		if( 0 > ret )
 		{
@@ -923,7 +939,7 @@ gint Mpeg4DecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V
 		}
 
 		// Initialize VPU
-		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize);
+		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize, NULL);
 
 		if( 0 > ret )
 		{
@@ -1140,7 +1156,7 @@ gint Div3DecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4
 		}
 
 		// Initialize VPU
-		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize);
+		ret = InitializeCodaVpu(pHDec, pSeqData, seqSize, NULL);
 
 		if( 0 > ret )
 		{
@@ -1425,7 +1441,7 @@ static gint FlushDecoder( NX_VIDEO_DEC_STRUCT *pDecHandle )
 	return 0;
 }
 
-static gint InitializeCodaVpu(NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pSeqInfo, gint seqInfoSize )
+static gint InitializeCodaVpu(NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pSeqInfo, gint seqInfoSize, gint *remain )
 {
 	gint ret = -1;
 
@@ -1488,6 +1504,10 @@ static gint InitializeCodaVpu(NX_VIDEO_DEC_STRUCT *pHDec, guint8 *pSeqInfo, gint
 		}
 
 		pHDec->imageFormat = nxImageFormat;
+		if( remain )
+		{
+			*remain = seqInfoSize - seqOut.usedByte;
+		}
 	}
 
 	FUNC_OUT();
