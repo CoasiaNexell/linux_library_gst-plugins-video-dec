@@ -517,8 +517,8 @@ gint AVCDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L
 		if( remain > 0 && pHDec->bLowDelay )
 		{
 			g_print("LowdDelay Mode, remain = %d\n", remain);
-			decIn.strmBuf = pSeqData;
-			decIn.strmSize = seqSize;
+			decIn.strmBuf = 0;
+			decIn.strmSize = 0;
 			decIn.timeStamp = 0;
 			decIn.eos = 0;
 			ret = NX_V4l2DecDecodeFrame( pHDec->hCodec,&decIn, pDecOut );
@@ -526,6 +526,8 @@ gint AVCDecodeFrame( NX_VIDEO_DEC_STRUCT *pDecHandle, GstBuffer *pGstBuf, NX_V4L
 			if( (0 == ret ) && (0 <= pDecOut->dispIdx) )
 			{
 				g_print("LowDelay Mode Got a Picture\n");
+				if( PIC_TYPE_I == pDecOut->picType[DISPLAY_FRAME] )
+					pHDec->bNeedIframe = FALSE;
 			}
 		}
 	}
